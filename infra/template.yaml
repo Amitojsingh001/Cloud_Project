@@ -1,0 +1,383 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Low-cost UCS531 campus issue tracker demo. A public static site calls API
+  Gateway, which performs scoped direct integrations with DynamoDB.
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    arch: S3 static site -> API Gateway service integrations -> DynamoDB
+    must:
+      - Demo only; API is unauthenticated, so use dummy data only.
+      - Reuse the existing complaint table and website bucket; do not replace either.
+      - Photos and asynchronous notifications are intentionally excluded.
+
+Parameters:
+  ExistingTableName:
+    Type: String
+    Default: campus-issue-tracker-demo-IssuesTable-1SGQXNDKCG2OJ
+    Description: Existing table retained from the Lambda-restricted first deployment attempt.
+  ExistingWebsiteBucketName:
+    Type: String
+    Default: campus-issue-tracker-demo-websitebucket-5vjdj4hwitz9
+    Description: Existing static website bucket retained from the first deployment attempt.
+
+Resources:
+  # API Gateway calls DynamoDB directly; this avoids the account's Lambda restriction.
+  ApiDynamoRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allow only the complaint read/write actions needed by the REST API.
+        must:
+          - Trust only API Gateway and scope data actions to this project's table/index.
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CampusIssueTableAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource: !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}'
+              - Effect: Allow
+                Action: dynamodb:Scan
+                Resource: !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}'
+              - Effect: Allow
+                Action: dynamodb:Query
+                Resource: !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ExistingTableName}/index/StudentIndex'
+
+  CampusIssueApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: campus-issue-tracker-demo-api
+      Description: Public classroom demo API for complaint submission, tracking, and status updates.
+      EndpointConfiguration:
+        Types: [REGIONAL]
+      Tags:
+        - Key: Project
+          Value: Assembly Required
+        - Key: Course
+          Value: UCS531
+
+  IssuesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ParentId: !GetAtt CampusIssueApi.RootResourceId
+      PathPart: issues
+
+  IssueIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ParentId: !Ref IssuesResource
+      PathPart: '{id}'
+
+  StatusResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ParentId: !Ref IssueIdResource
+      PathPart: status
+
+  AdminResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ParentId: !GetAtt CampusIssueApi.RootResourceId
+      PathPart: admin
+
+  AdminIssuesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ParentId: !Ref AdminResource
+      PathPart: issues
+
+  CreateComplaintMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResourceId: !Ref IssuesResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Credentials: !GetAtt ApiDynamoRole.Arn
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/PutItem'
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: !Sub |
+            {
+              "TableName": "${ExistingTableName}",
+              "Item": {
+                "issueId": {"S": $input.json('$.issueId')},
+                "studentId": {"S": $input.json('$.studentId')},
+                "studentEmail": {"S": $input.json('$.studentEmail')},
+                "category": {"S": $input.json('$.category')},
+                "title": {"S": $input.json('$.title')},
+                "description": {"S": $input.json('$.description')},
+                "photoUrl": {"NULL": true},
+                "status": {"S": "Open"},
+                "createdAt": {"S": $input.json('$.createdAt')},
+                "updatedAt": {"S": $input.json('$.updatedAt')}
+              }
+            }
+        IntegrationResponses:
+          - StatusCode: '201'
+            ResponseTemplates:
+              application/json: '{"message":"Issue submitted successfully"}'
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '201'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  ListComplaintsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResourceId: !Ref IssuesResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.querystring.studentId: false
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Credentials: !GetAtt ApiDynamoRole.Arn
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/Query'
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: !Sub |
+            {
+              "TableName": "${ExistingTableName}",
+              "IndexName": "StudentIndex",
+              "KeyConditionExpression": "studentId = :studentId",
+              "ExpressionAttributeValues": {":studentId": {"S": "$util.escapeJavaScript($input.params('studentId')).replaceAll("\\'","'")"}},
+              "ScanIndexForward": false,
+              "Limit": 100
+            }
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: |
+                #set($items = $input.path('$.Items'))
+                {"count":$items.size(),"issues":[
+                #foreach($item in $items)
+                #if($foreach.index > 0),#end
+                {"issueId":"$util.escapeJavaScript($item.issueId.S).replaceAll("\\'","'")","studentId":"$util.escapeJavaScript($item.studentId.S).replaceAll("\\'","'")","studentEmail":"$util.escapeJavaScript($item.studentEmail.S).replaceAll("\\'","'")","category":"$util.escapeJavaScript($item.category.S).replaceAll("\\'","'")","title":"$util.escapeJavaScript($item.title.S).replaceAll("\\'","'")","description":"$util.escapeJavaScript($item.description.S).replaceAll("\\'","'")","photoUrl":null,"status":"$util.escapeJavaScript($item.status.S).replaceAll("\\'","'")","createdAt":"$util.escapeJavaScript($item.createdAt.S).replaceAll("\\'","'")","updatedAt":"$util.escapeJavaScript($item.updatedAt.S).replaceAll("\\'","'")"}
+                #end
+                ]}
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  ListAdminComplaintsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResourceId: !Ref AdminIssuesResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Credentials: !GetAtt ApiDynamoRole.Arn
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/Scan'
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: !Sub |
+            {"TableName":"${ExistingTableName}","Limit":100}
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: |
+                #set($items = $input.path('$.Items'))
+                {"count":$items.size(),"issues":[
+                #foreach($item in $items)
+                #if($foreach.index > 0),#end
+                {"issueId":"$util.escapeJavaScript($item.issueId.S).replaceAll("\\'","'")","studentId":"$util.escapeJavaScript($item.studentId.S).replaceAll("\\'","'")","studentEmail":"$util.escapeJavaScript($item.studentEmail.S).replaceAll("\\'","'")","category":"$util.escapeJavaScript($item.category.S).replaceAll("\\'","'")","title":"$util.escapeJavaScript($item.title.S).replaceAll("\\'","'")","description":"$util.escapeJavaScript($item.description.S).replaceAll("\\'","'")","photoUrl":null,"status":"$util.escapeJavaScript($item.status.S).replaceAll("\\'","'")","createdAt":"$util.escapeJavaScript($item.createdAt.S).replaceAll("\\'","'")","updatedAt":"$util.escapeJavaScript($item.updatedAt.S).replaceAll("\\'","'")"}
+                #end
+                ]}
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  UpdateComplaintStatusMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResourceId: !Ref StatusResource
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.id: true
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Credentials: !GetAtt ApiDynamoRole.Arn
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:dynamodb:action/UpdateItem'
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: !Sub |
+            {
+              "TableName": "${ExistingTableName}",
+              "Key": {"issueId": {"S": "$util.escapeJavaScript($input.params('id')).replaceAll("\\'","'")"}},
+              "UpdateExpression": "SET #status = :status, #updatedAt = :updatedAt",
+              "ConditionExpression": "attribute_exists(issueId)",
+              "ExpressionAttributeNames": {"#status": "status", "#updatedAt": "updatedAt"},
+              "ExpressionAttributeValues": {":status": {"S": $input.json('$.status')}, ":updatedAt": {"S": $input.json('$.updatedAt')}},
+              "ReturnValues": "ALL_NEW"
+            }
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: |
+                #set($item = $input.path('$.Attributes'))
+                {"message":"Issue status updated successfully","issue":{"issueId":"$util.escapeJavaScript($item.issueId.S).replaceAll("\\'","'")","studentId":"$util.escapeJavaScript($item.studentId.S).replaceAll("\\'","'")","studentEmail":"$util.escapeJavaScript($item.studentEmail.S).replaceAll("\\'","'")","category":"$util.escapeJavaScript($item.category.S).replaceAll("\\'","'")","title":"$util.escapeJavaScript($item.title.S).replaceAll("\\'","'")","description":"$util.escapeJavaScript($item.description.S).replaceAll("\\'","'")","photoUrl":null,"status":"$util.escapeJavaScript($item.status.S).replaceAll("\\'","'")","createdAt":"$util.escapeJavaScript($item.createdAt.S).replaceAll("\\'","'")","updatedAt":"$util.escapeJavaScript($item.updatedAt.S).replaceAll("\\'","'")"}}
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  OptionsIssuesMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResourceId: !Ref IssuesResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode":200}'
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+
+  OptionsStatusMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResourceId: !Ref StatusResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode":200}'
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+
+  Default4xxResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,OPTIONS'"
+
+  Default5xxResponse:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,OPTIONS'"
+
+  PublicWebsitePolicy:
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Bucket: !Ref ExistingWebsiteBucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadWebsiteFilesOnly
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${ExistingWebsiteBucketName}/*'
+
+  ApiDeploymentV2:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - CreateComplaintMethod
+      - ListComplaintsMethod
+      - ListAdminComplaintsMethod
+      - UpdateComplaintStatusMethod
+      - OptionsIssuesMethod
+      - OptionsStatusMethod
+    Properties:
+      RestApiId: !Ref CampusIssueApi
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: dev
+      RestApiId: !Ref CampusIssueApi
+      DeploymentId: !Ref ApiDeploymentV2
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 10
+          ThrottlingRateLimit: 5
+
+Outputs:
+  ApiGatewayUrl:
+    Description: Base URL for the Campus Issue Tracker API.
+    Value: !Sub 'https://${CampusIssueApi}.execute-api.${AWS::Region}.amazonaws.com/dev'
+  WebsiteUrl:
+    Description: Public static frontend URL (S3 website endpoint uses HTTP).
+    Value: !Sub 'http://${ExistingWebsiteBucketName}.s3-website-${AWS::Region}.amazonaws.com'
+  WebsiteBucketName:
+    Description: Existing bucket hosting the frontend.
+    Value: !Ref ExistingWebsiteBucketName
+  DynamoDBTableName:
+    Description: Existing table holding demo complaints.
+    Value: !Ref ExistingTableName

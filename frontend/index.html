@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Issue Reporting & Tracking Portal | Student View</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top API Configuration Bar -->
+  <div class="api-bar">
+    <div class="api-bar-container">
+      <div class="api-status">
+        <span class="status-dot offline" id="api-status-dot"></span>
+        <span id="api-status-text">Checking AWS API Gateway...</span>
+      </div>
+      <div class="api-input-group">
+        <label for="api-base-url-input" style="font-weight:600; font-size:0.75rem;">API URL:</label>
+        <input type="text" id="api-base-url-input" class="api-input" placeholder="https://api-id.execute-api.region.amazonaws.com/dev">
+        <button id="api-save-btn" class="btn btn-secondary btn-sm">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="brand">
+        <div class="brand-icon">🎓</div>
+        <div class="brand-text">
+          <h1>Campus Issue Tracker</h1>
+          <span>UCS531: Cloud Computing System</span>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link active">Student Portal</a>
+        <a href="admin.html" class="nav-link">Admin Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-content">
+    <!-- Hero Banner -->
+    <div class="hero">
+      <h2>Report Campus Infrastructure Issues</h2>
+      <p>Submit and track maintenance requests across academic blocks, labs, and student hostels in real time. Powered by a high-availability serverless cloud architecture.</p>
+      <div class="hero-tags">
+        <span class="hero-tag">☁️ AWS S3</span>
+        <span class="hero-tag">⚡ API Gateway</span>
+        <span class="hero-tag">🚪 API Gateway</span>
+        <span class="hero-tag">📝 Status Tracking</span>
+        <span class="hero-tag">🗄️ DynamoDB</span>
+      </div>
+    </div>
+
+    <!-- Student View Grid -->
+    <div class="grid-2">
+
+      <!-- Column 1: Submit Issue Form -->
+      <section class="card">
+        <h3 class="card-title">📝 Report an Issue</h3>
+        <p class="card-subtitle">Fill in the form below. An alert will be queued for maintenance admins.</p>
+
+        <form id="issue-form">
+          <div class="form-group">
+            <label class="form-label" for="student-id">Student Roll / ID <span class="required">*</span></label>
+            <input type="text" id="student-id" class="form-control" placeholder="e.g. 102103456" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="student-email">Student Email (For Status Notifications) <span class="required">*</span></label>
+            <input type="email" id="student-email" class="form-control" placeholder="e.g. student@thapar.edu" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="category">Category <span class="required">*</span></label>
+            <select id="category" class="form-control" required>
+              <option value="" disabled selected>Select issue category...</option>
+              <option value="Electrical">Electrical (Lights, Fans, ACs, Switches)</option>
+              <option value="Network">Network & Wi-Fi Connectivity</option>
+              <option value="Plumbing">Plumbing & Water Supply</option>
+              <option value="Hostel Maintenance">Hostel Maintenance & Cleaning</option>
+              <option value="Furniture">Furniture & Carpentry</option>
+              <option value="Lab Equipment">Lab & Classroom Equipment</option>
+              <option value="Other">Other Issues</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="title">Issue Summary / Title <span class="required">*</span></label>
+            <input type="text" id="title" class="form-control" placeholder="e.g. Water leakage in Hostel G 3rd floor washroom" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="description">Detailed Description <span class="required">*</span></label>
+            <textarea id="description" class="form-control" placeholder="Describe the problem, exact room/floor location, and how urgent it is..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <p class="card-subtitle">Photo uploads are disabled in this low-cost demonstration.</p>
+          </div>
+
+          <button type="submit" id="submit-issue-btn" class="btn btn-primary btn-full">
+            🚀 Submit Issue to Cloud
+          </button>
+        </form>
+      </section>
+
+      <!-- Column 2: Track Previously Submitted Issues -->
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.35rem;">
+          <h3 class="card-title">🔍 Track My Reports</h3>
+          <span class="badge badge-category" id="student-issues-count">0 Issues</span>
+        </div>
+        <p class="card-subtitle">Query DynamoDB Global Secondary Index (GSI) by your Student ID.</p>
+
+        <div style="display:flex; gap:0.5rem; margin-bottom: 1.25rem;">
+          <input type="text" id="track-student-id" class="form-control" placeholder="Enter your Student ID (e.g. 102103456)">
+          <button id="track-btn" class="btn btn-secondary" style="white-space:nowrap;">Search</button>
+        </div>
+
+        <!-- Issue Feed Container -->
+        <div id="student-issues-container" class="issues-feed">
+          <div style="text-align:center; padding: 2.5rem; background: #f8fafc; border: 1px dashed var(--border); border-radius: var(--radius-md); color: var(--text-muted);">
+            Enter your Student ID above or submit a report to view live issue statuses.
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    UCS531: Cloud Computing — Serverless Campus Issue Reporting & Tracking System &bull; Powered by API Gateway, DynamoDB, and S3
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      initStudentPortal();
+    });
+  </script>
+</body>
+</html>
+

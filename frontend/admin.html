@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Issue Reporting & Tracking Portal | Admin Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top API Configuration Bar -->
+  <div class="api-bar">
+    <div class="api-bar-container">
+      <div class="api-status">
+        <span class="status-dot offline" id="api-status-dot"></span>
+        <span id="api-status-text">Checking AWS API Gateway...</span>
+      </div>
+      <div class="api-input-group">
+        <label for="api-base-url-input" style="font-weight:600; font-size:0.75rem;">API URL:</label>
+        <input type="text" id="api-base-url-input" class="api-input" placeholder="https://api-id.execute-api.region.amazonaws.com/dev">
+        <button id="api-save-btn" class="btn btn-secondary btn-sm">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="admin.html" class="brand">
+        <div class="brand-icon">🛠️</div>
+        <div class="brand-text">
+          <h1>Campus Admin Portal</h1>
+          <span>Facilities & Maintenance Control</span>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link">Student Portal</a>
+        <a href="admin.html" class="nav-link active">Admin Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-content">
+
+    <!-- Metrics Stat Cards -->
+    <section class="metrics-row">
+      <div class="metric-card">
+        <div>
+          <div class="metric-label">Total Issues</div>
+          <div class="metric-value" id="metric-total">0</div>
+        </div>
+        <div style="font-size:2rem; color:var(--text-muted);">📋</div>
+      </div>
+
+      <div class="metric-card">
+        <div>
+          <div class="metric-label" style="color:var(--status-open-text);">Open</div>
+          <div class="metric-value" style="color:var(--status-open-text);" id="metric-open">0</div>
+        </div>
+        <div style="font-size:2rem; color:var(--accent);">⚠️</div>
+      </div>
+
+      <div class="metric-card">
+        <div>
+          <div class="metric-label" style="color:var(--status-progress-text);">In Progress</div>
+          <div class="metric-value" style="color:var(--status-progress-text);" id="metric-progress">0</div>
+        </div>
+        <div style="font-size:2rem; color:var(--primary);">⚡</div>
+      </div>
+
+      <div class="metric-card">
+        <div>
+          <div class="metric-label" style="color:var(--status-resolved-text);">Resolved</div>
+          <div class="metric-value" style="color:var(--status-resolved-text);" id="metric-resolved">0</div>
+        </div>
+        <div style="font-size:2rem; color:var(--success);">✅</div>
+      </div>
+    </section>
+
+    <!-- Admin Filter & Search Bar -->
+    <section class="filter-bar">
+      <div class="filter-group">
+        <label for="admin-filter-status" style="font-weight:600; font-size:0.85rem;">Status Filter:</label>
+        <select id="admin-filter-status" class="form-control" style="width: auto; padding: 0.4rem 0.75rem;">
+          <option value="All">All Statuses</option>
+          <option value="Open">Open Only</option>
+          <option value="In Progress">In Progress Only</option>
+          <option value="Resolved">Resolved Only</option>
+        </select>
+      </div>
+
+      <div class="filter-group" style="flex:1; max-width:400px;">
+        <input type="text" id="admin-search-input" class="form-control" placeholder="Search by title, student ID, email...">
+      </div>
+
+      <button id="admin-refresh-btn" class="btn btn-secondary">
+        🔄 Refresh Data
+      </button>
+    </section>
+
+    <!-- Issues Table -->
+    <section class="table-container">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Student</th>
+            <th>Category</th>
+            <th>Issue Details</th>
+            <th>Current Status</th>
+            <th>Action / Update</th>
+          </tr>
+        </thead>
+        <tbody id="admin-table-body">
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+              Connecting to DynamoDB...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    UCS531: Cloud Computing — Serverless Campus Issue Reporting & Tracking System &bull; Admin Operations Dashboard
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      initAdminPortal();
+    });
+  </script>
+</body>
+</html>
+

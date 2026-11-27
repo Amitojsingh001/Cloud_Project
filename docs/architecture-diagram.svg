@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 600" role="img" aria-labelledby="title description">
+  <title id="title">Campus Issue Tracker demo architecture</title>
+  <desc id="description">Student and admin browsers load a public static site from S3 and call an HTTPS API Gateway. Direct API Gateway service integrations read and write complaint records in DynamoDB.</desc>
+  <defs>
+    <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#172554"/></linearGradient>
+    <linearGradient id="blue" x2="1" y2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient>
+    <linearGradient id="teal" x2="1" y2="1"><stop stop-color="#0d9488"/><stop offset="1" stop-color="#0f766e"/></linearGradient>
+    <linearGradient id="purple" x2="1" y2="1"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#5b21b6"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#94a3b8"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#020617" flood-opacity=".45"/></filter>
+    <style>
+      text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}.title{font-size:23px;font-weight:750;fill:#f8fafc}.subtitle{font-size:13px;fill:#cbd5e1}.card{fill:#111827;stroke:#475569;stroke-width:1.5}.head{font-size:13px;font-weight:700;fill:#fff}.label{font-size:12px;font-weight:650;fill:#f8fafc}.small{font-size:10px;fill:#cbd5e1}.tiny{font-size:9px;fill:#94a3b8}.flow{stroke:#94a3b8;stroke-width:2;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1080" height="600" fill="url(#bg)"/>
+  <text x="50" y="48" class="title">Campus Issue Tracker</text>
+  <text x="50" y="72" class="subtitle">UCS531 cloud computing demonstration • AWS Region: ap-southeast-2</text>
+  <rect x="32" y="100" width="1016" height="455" rx="22" fill="#0b1220" stroke="#334155" stroke-dasharray="7 6"/>
+  <text x="55" y="128" class="tiny" font-weight="700" letter-spacing="1.4">AWS SERVERLESS DEMO</text>
+
+  <g filter="url(#shadow)">
+    <rect x="58" y="175" width="195" height="255" rx="14" class="card"/>
+    <rect x="58" y="175" width="195" height="40" rx="14" fill="url(#blue)"/>
+    <text x="155" y="200" text-anchor="middle" class="head">BROWSER CLIENTS</text>
+    <rect x="78" y="235" width="155" height="70" rx="9" fill="#1e293b" stroke="#334155"/>
+    <text x="95" y="260" class="label">Student Portal</text><text x="95" y="281" class="small">Submit and track</text>
+    <rect x="78" y="322" width="155" height="70" rx="9" fill="#1e293b" stroke="#334155"/>
+    <text x="95" y="347" class="label">Admin Dashboard</text><text x="95" y="368" class="small">Review and update</text>
+    <text x="78" y="414" class="tiny">Dummy student records only</text>
+
+    <rect x="320" y="175" width="200" height="110" rx="14" class="card"/>
+    <rect x="320" y="175" width="200" height="40" rx="14" fill="url(#teal)"/>
+    <text x="420" y="200" text-anchor="middle" class="head">AMAZON S3</text>
+    <text x="340" y="245" class="label">Static website hosting</text><text x="340" y="266" class="small">Student + admin pages</text>
+
+    <rect x="320" y="350" width="200" height="100" rx="14" class="card"/>
+    <rect x="320" y="350" width="200" height="40" rx="14" fill="url(#blue)"/>
+    <text x="420" y="375" text-anchor="middle" class="head">API GATEWAY</text>
+    <text x="340" y="418" class="label">HTTPS REST API</text><text x="340" y="437" class="tiny">Throttled • CORS for browser</text>
+
+    <rect x="600" y="175" width="220" height="255" rx="14" class="card"/>
+    <rect x="600" y="175" width="220" height="40" rx="14" fill="url(#purple)"/>
+    <text x="710" y="200" text-anchor="middle" class="head">API GATEWAY VTL</text>
+    <rect x="620" y="235" width="180" height="48" rx="7" fill="#1e293b" stroke="#475569"/>
+    <text x="635" y="255" class="label">PutItem</text><text x="635" y="272" class="tiny">submit complaint</text>
+    <rect x="620" y="296" width="180" height="48" rx="7" fill="#1e293b" stroke="#475569"/>
+    <text x="635" y="316" class="label">Query / Scan</text><text x="635" y="333" class="tiny">student + admin lists</text>
+    <rect x="620" y="357" width="180" height="48" rx="7" fill="#1e293b" stroke="#475569"/>
+    <text x="635" y="377" class="label">UpdateItem</text><text x="635" y="394" class="tiny">change complaint status</text>
+    <text x="620" y="419" class="tiny">Scoped IAM • throttled</text>
+
+    <rect x="880" y="235" width="145" height="175" rx="14" class="card"/>
+    <rect x="880" y="235" width="145" height="40" rx="14" fill="url(#blue)"/>
+    <text x="952" y="260" text-anchor="middle" class="head">DYNAMODB</text>
+    <text x="900" y="305" class="label">On-demand table</text><text x="900" y="330" class="small">issueId key</text><text x="900" y="352" class="small">StudentIndex GSI</text><text x="900" y="385" class="tiny">Complaint records</text>
+  </g>
+  <path d="M253 270 C282 270 290 230 320 230" class="flow"/>
+  <path d="M253 355 C285 355 290 400 320 400" class="flow"/>
+  <path d="M520 400 H600" class="flow"/>
+  <path d="M820 320 H880" class="flow"/>
+  <path d="M520 230 C570 230 560 350 600 350" class="flow"/>
+  <text x="55" y="530" class="small">Demo constraints: unauthenticated API • public read-only website files • no photos or notifications</text>
+</svg>
